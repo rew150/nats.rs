@@ -256,6 +256,10 @@ impl Error {
     pub fn error_code(&self) -> ErrorCode {
         self.err_code
     }
+
+    pub fn kind(&self) -> ErrorCode {
+        self.err_code
+    }
 }
 
 impl fmt::Display for Error {

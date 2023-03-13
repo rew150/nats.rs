@@ -34,7 +34,7 @@ use std::task::Poll;
 use std::time::Duration;
 use tracing::debug;
 
-use super::errors::impls;
+use super::errors::{impls, ErrorCode};
 use super::kv::{Store, MAX_HISTORY};
 use super::object_store::{is_valid_bucket_name, ObjectStore};
 use super::stream::{self, Config, DeleteStatus, DiscardPolicy, External, Info, Stream};
@@ -904,13 +904,17 @@ impl Display for PublishError {
             PublishErrorKind::TimedOut => write!(f, "timed out: didn't receive ack in time"),
             PublishErrorKind::Other => write!(f, "publish failed: {}", source),
             PublishErrorKind::BrokenPipe => write!(f, "broken pipe"),
+            PublishErrorKind::WrongLastMessageId => write!(f, "wrong last message id"),
+            PublishErrorKind::WrongLastSequence => write!(f, "wrong last sequence"),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PublishErrorKind {
     StreamNotFound,
+    WrongLastMessageId,
+    WrongLastSequence,
     TimedOut,
     BrokenPipe,
     Other,
@@ -937,9 +941,17 @@ impl PublishAckFuture {
                 let response = serde_json::from_slice(m.payload.as_ref())
                     .map_err(|err| PublishError::with_source(PublishErrorKind::Other, err))?;
                 match response {
-                    Response::Err { error } => {
-                        Err(PublishError::with_source(PublishErrorKind::Other, error))
-                    }
+                    Response::Err { error } => match error.error_code() {
+                        ErrorCode::StreamWrongLastMsgId => Err(PublishError::with_source(
+                            PublishErrorKind::WrongLastMessageId,
+                            error,
+                        )),
+                        ErrorCode::StreamWrongLastSequence => Err(PublishError::with_source(
+                            PublishErrorKind::WrongLastSequence,
+                            error,
+                        )),
+                        _ => Err(PublishError::with_source(PublishErrorKind::Other, error)),
+                    },
                     Response::Ok(publish_ack) => Ok(publish_ack),
                 }
             },
@@ -1192,7 +1204,7 @@ impl From<super::context::RequestError> for JetStreamError {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RequestErrorKind {
     NoResponders,
     TimedOut,

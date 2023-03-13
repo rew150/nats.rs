@@ -35,7 +35,7 @@ mod jetstream {
     use async_nats::jetstream::consumer::{
         self, AckPolicy, DeliverPolicy, Info, OrderedPushConsumer, PullConsumer, PushConsumer,
     };
-    use async_nats::jetstream::context::Publish;
+    use async_nats::jetstream::context::{Publish, PublishErrorKind};
     use async_nats::jetstream::response::Response;
     use async_nats::jetstream::stream::{self, DiscardPolicy, StorageType};
     use async_nats::jetstream::AckKind;
@@ -160,7 +160,7 @@ mod jetstream {
         assert_eq!(message.payload, bytes::Bytes::from("data"));
 
         // Publish message with different ID and expect error.
-        context
+        let err = context
             .send_publish(
                 "foo".to_string(),
                 Publish::build().expected_last_message_id("BAD_ID"),
@@ -168,7 +168,9 @@ mod jetstream {
             .await
             .unwrap()
             .await
-            .unwrap_err();
+            .unwrap_err()
+            .kind();
+        assert_eq!(err, PublishErrorKind::WrongLastMessageId);
         // Publish a new message with expected ID.
         context
             .send_publish(
@@ -191,15 +193,19 @@ mod jetstream {
             .await
             .unwrap();
         // 3 messages should be there, so this should error.
-        context
-            .send_publish(
-                "foo".to_string(),
-                Publish::build().expected_last_sequence(2),
-            )
-            .await
-            .unwrap()
-            .await
-            .unwrap_err();
+        assert_eq!(
+            context
+                .send_publish(
+                    "foo".to_string(),
+                    Publish::build().expected_last_sequence(2),
+                )
+                .await
+                .unwrap()
+                .await
+                .unwrap_err()
+                .kind(),
+            PublishErrorKind::WrongLastSequence
+        );
         // 3 messages there, should be ok for this subject too.
         context
             .send_publish(
@@ -211,15 +217,19 @@ mod jetstream {
             .await
             .unwrap();
         // 4 messages there, should error.
-        context
-            .send_publish(
-                "foo".to_string(),
-                Publish::build().expected_last_subject_sequence(3),
-            )
-            .await
-            .unwrap()
-            .await
-            .unwrap_err();
+        assert_eq!(
+            context
+                .send_publish(
+                    "foo".to_string(),
+                    Publish::build().expected_last_subject_sequence(3),
+                )
+                .await
+                .unwrap()
+                .await
+                .unwrap_err()
+                .kind(),
+            PublishErrorKind::WrongLastSequence
+        );
 
         // Check if it works for the other subjects in the stream.
         context
@@ -2326,18 +2336,16 @@ mod jetstream {
                 .unwrap();
         }
         drop(server);
-        let ack = jetstream
-            .publish("events".into(), "fail".into())
-            .await
-            .unwrap()
-            .await;
-        // assert_eq!(
-        //     ack.unwrap_err()
-        //         .downcast::<std::io::Error>()
-        //         .unwrap()
-        //         .kind(),
-        //     ErrorKind::TimedOut
-        // )
+        assert_eq!(
+            jetstream
+                .publish("events".into(), "fail".into())
+                .await
+                .unwrap()
+                .await
+                .unwrap_err()
+                .kind(),
+            PublishErrorKind::TimedOut
+        );
     }
 
     #[tokio::test]
@@ -2820,7 +2828,6 @@ mod jetstream {
 
     #[tokio::test]
     async fn publish_no_stream() {
-        use std::error::Error;
         let server = nats_server::run_server("tests/configs/jetstream.conf");
         let client = async_nats::connect(server.client_url()).await.unwrap();
         let context = async_nats::jetstream::new(client.clone());
@@ -2831,12 +2838,8 @@ mod jetstream {
                 .unwrap()
                 .await
                 .unwrap_err()
-                .source()
-                .unwrap()
-                .downcast_ref::<std::io::Error>()
-                .unwrap()
                 .kind(),
-            std::io::ErrorKind::NotFound
+            PublishErrorKind::StreamNotFound
         );
     }
 
