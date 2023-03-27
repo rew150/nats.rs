@@ -325,20 +325,13 @@ impl Store {
                             raw_message.time,
                         ))
                     }
-                    Err(err) => {
-                        // FIXME(tp): handle it properly when we have proper errors
-                        let de = err
-                            .source()
-                            .unwrap()
-                            .downcast_ref::<super::errors::Error>()
-                            .unwrap();
-                        // 10037 is returned when there are no messages found.
-                        if de.code() == 10037 {
-                            None
-                        } else {
-                            return Err(err);
+                    Err(err) => match err.kind() {
+                        crate::jetstream::stream::LastRawMessageErrorKind::NoMessageFound => None,
+                        crate::jetstream::stream::LastRawMessageErrorKind::Other
+                        | crate::jetstream::stream::LastRawMessageErrorKind::JetStreamError => {
+                            return Err(Box::new(err))
                         }
-                    }
+                    },
                 }
             }
         };

@@ -755,7 +755,12 @@ impl Context {
         let message = self
             .client
             .request(format!("{}.{}", self.prefix, subject), request)
-            .await?;
+            .await;
+        match message.as_ref() {
+            Ok(resp) => println!("RESP: {:?}", resp),
+            Err(err) => println!("ERRO: {:?}", err),
+        };
+        let message = message?;
         debug!(
             "JetStream request response: {:?}",
             from_utf8(&message.payload)

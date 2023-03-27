@@ -16,7 +16,7 @@
 #[cfg(feature = "server_2_10")]
 use std::collections::HashMap;
 use std::{
-    fmt::Debug,
+    fmt::{self, Debug},
     future::IntoFuture,
     io::{self, ErrorKind},
     pin::Pin,
@@ -37,6 +37,7 @@ use time::{serde::rfc3339, OffsetDateTime};
 
 use super::{
     consumer::{self, Consumer, FromConsumer, IntoConsumerConfig},
+    errors::{impls, ErrorCode},
     response::Response,
     Context, Message,
 };
@@ -448,15 +449,29 @@ impl Stream {
     pub async fn get_last_raw_message_by_subject(
         &self,
         stream_subject: &str,
-    ) -> Result<RawMessage, Error> {
+    ) -> Result<RawMessage, LastRawMessageError> {
         let subject = format!("STREAM.MSG.GET.{}", &self.info.config.name);
         let payload = json!({
             "last_by_subj":  stream_subject,
         });
 
-        let response: Response<GetRawMessage> = self.context.request(subject, &payload).await?;
+        let response: Response<GetRawMessage> = self
+            .context
+            .request(subject, &payload)
+            .map_err(|err| LastRawMessageError::with_source(LastRawMessageErrorKind::Other, err))
+            .await?;
         match response {
-            Response::Err { error } => Err(Box::new(std::io::Error::new(ErrorKind::Other, error))),
+            Response::Err { error } => {
+                if error.error_code() == ErrorCode::NoMessageFound {
+                    Err(LastRawMessageError::new(
+                        LastRawMessageErrorKind::NoMessageFound,
+                    ))
+                } else {
+                    Err(LastRawMessageError::new(
+                        LastRawMessageErrorKind::JetStreamError,
+                    ))
+                }
+            }
             Response::Ok(value) => Ok(value.message),
         }
     }
@@ -1561,4 +1576,49 @@ impl futures::Stream for Consumers<'_> {
             }
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub struct LastRawMessageError {
+    source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    kind: LastRawMessageErrorKind,
+}
+impl LastRawMessageError {
+    impls!(LastRawMessageErrorKind);
+
+    fn jetstream_error(&self) -> Option<super::errors::Error> {
+        self.source
+            .as_ref()
+            .and_then(|err| err.downcast_ref::<super::errors::Error>())
+            .cloned()
+    }
+}
+
+impl fmt::Display for LastRawMessageError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            LastRawMessageErrorKind::NoMessageFound => write!(f, "no message found"),
+            LastRawMessageErrorKind::Other => write!(
+                f,
+                "failed to get last raw message: {}",
+                self.format_source()
+            ),
+            LastRawMessageErrorKind::JetStreamError => {
+                write!(
+                    f,
+                    "JetStream error: {}",
+                    self.jetstream_error()
+                        .map(|err| err.to_string())
+                        .unwrap_or("None".to_string())
+                )
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum LastRawMessageErrorKind {
+    NoMessageFound,
+    JetStreamError,
+    Other,
 }
