@@ -182,10 +182,6 @@ pub enum ErrorCode {
     ConsumerDeliverCycle = 10081,
     /// Consumer requires ack policy for max ack pending
     ConsumerMaxPendingAckPolicyRequired = 10082,
-    /// JSConsumerMaxRequestBatchNegative consumer max request batch needs to be > 0
-    JSConsumerMaxRequestBatchNegative = 10114,
-    /// JSConsumerMaxRequestExpiresToSmall consumer max request expires needs to be >= 1ms
-    JSConsumerMaxRequestExpiresToSmall = 10115,
     /// Consumer idle heartbeat needs to be >= 100ms
     ConsumerSmallHeartbeat = 10083,
     /// Consumer in pull mode requires ack policy
@@ -236,6 +232,70 @@ pub enum ErrorCode {
     ConsumerDescriptionTooLong = 10107,
     /// Header size exceeds maximum allowed of 64k
     StreamHeaderExceedsMaximum = 10097,
+    /// Consumer with flow control also needs heartbeats
+    ConsumerWithFlowControlNeedsHeartbeats = 10108,
+    /// Invalid operation on sealed stream
+    StreamSelealed = 10109,
+    /// Generic stream purge failure error string
+    StreamPurgeFailed = 10110,
+    /// Generic stream rollup failure error string
+    StreamRollupFailed = 10111,
+    /// Returned when the delivery subject on a Push Consumer is not a valid NATS Subject
+    ConsumerInvalidDeliverSubject = 10112,
+    /// Account requires a stream config to have max bytes set
+    StreamMaxBytesRequired = 10113,
+    /// Consumer max request batch needs to be > 0
+    ConsumerMaxRequestBatchNegative = 10114,
+    /// Consumer max request expires needs to be > 1ms
+    ConsumerMaxRequestExpiresToSmall = 10115,
+    /// Max deliver is required to be > length of backoff values
+    ConsumerMaxDeliverBackoff = 10116,
+    /// Subject details would exceed maximum allowed
+    StreamInfoMaxSubjects = 10117,
+    /// Stream is offline
+    StreamOffline = 10118,
+    /// Consumer is offline
+    ConsumerOffline = 10119,
+    /// No JetStream default or applicable tiered limit present
+    NoLimits = 10120,
+    /// Consumer max ack pending exceeds system limit of {limit}
+    ConsumerMaxPendingAckExcessErrF = 10121,
+    /// Stream max bytes exceeds account limit max stream bytes
+    StreamMaxStreamBytesExceeded = 10122,
+    /// Can not move and scale a stream in a single update
+    StreamMoveAndScale = 10123,
+    /// Stream move already in progress: {msg}
+    StreamMoveInProgressF = 10124,
+    /// Consumer max request batch exceeds server limit of {limit}
+    ConsumerMaxRequestBatchExceededF = 10125,
+    /// Consumer config replica count exceeds parent stream
+    ConsumerReplicasExceedsStream = 10126,
+    /// Consumer name can not contain path separators
+    ConsumerNameContainsPathSeparators = 10127,
+    /// Stream name can not contain path separators
+    StreamNameContainsPathSeparators = 10128,
+    /// Stream move not in progress
+    StreamMoveNotInProgress = 10129,
+    /// Stream name already in use, cannot restore
+    StreamNameExistRestoreFailed = 10130,
+    /// Consumer create request did not match filtered subject from create subject
+    ConsumerCreateFilterSubjectMismatch = 10131,
+    /// Consumer Durable and Name have to be equal if both are provided
+    ConsumerCreateDurableAndNameMismatch = 10132,
+    /// Replicas count cannot be negative
+    ReplicasCountCannotBeNegative = 10133,
+    /// Consumer config replicas must match interest retention stream's replicas
+    ConsumerReplicasShouldMatchStream = 10134,
+    /// Consumer metadata exceeds maximum size of {limit}
+    ConsumerMetadataLengthErrF = 10135,
+    /// Consumer cannot have both FilterSubject and FilterSubjects specified
+    ConsumerDuplicateFilterSubjects = 10136,
+    /// Consumer with multiple subject filters cannot use subject based API
+    ConsumerMultipleFiltersNotAllowed = 10137,
+    /// Consumer subject filters cannot overlap
+    ConsumerOverlappingSubjectFilters = 10138,
+    /// Consumer filter in FilterSubjects cannot be empty
+    ConsumerEmptyFilter = 10139,
 }
 
 /// `Error` type returned from an API response when an error occurs.
