@@ -143,6 +143,7 @@ pub trait FromConsumer {
 
 pub type PullConsumer = Consumer<self::pull::Config>;
 pub type PushConsumer = Consumer<self::push::Config>;
+pub type OrderedPullConsumer = Consumer<self::pull::OrderedConfig>;
 pub type OrderedPushConsumer = Consumer<self::push::OrderedConfig>;
 
 /// Information about a consumer
