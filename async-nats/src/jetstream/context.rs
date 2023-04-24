@@ -1258,3 +1258,44 @@ impl From<crate::RequestError> for RequestError {
         }
     }
 }
+
+#[derive(Debug, Error)]
+pub struct CreateStreamError {
+    kind: CreateStreamErrorKind,
+    source: Option<Box<dyn std::error::Error + Send + Sync>>,
+}
+
+impl CreateStreamError {
+    impls!(CreateStreamErrorKind);
+}
+
+impl Display for CreateStreamError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.kind {
+            CreateStreamErrorKind::EmptyStreamName => write!(f, "stream name cannot be empty"),
+            CreateStreamErrorKind::InvalidStreamName => {
+                write!(f, "stream name cannot contain `.`, `_`")
+            }
+            CreateStreamErrorKind::DomainAndExternalSet => {
+                write!(f, "domain and external are both set")
+            }
+            CreateStreamErrorKind::JetStreamError => {
+                write!(f, "jetstream error: {}", self.format_source())
+            }
+        }
+    }
+}
+
+impl From<super::errors::Error> for CreateStreamError {
+    fn from(error: super::errors::Error) -> Self {
+        CreateStreamError::with_source(CreateStreamErrorKind::JetStreamError, error)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CreateStreamErrorKind {
+    EmptyStreamName,
+    InvalidStreamName,
+    DomainAndExternalSet,
+    JetStreamError,
+}
