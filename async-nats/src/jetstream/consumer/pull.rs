@@ -493,7 +493,6 @@ impl<'a> Consumer<OrderedConfig> {
             context: self.context.clone(),
             info: self.info.clone(),
         };
-
         let stream = Stream::stream(
             BatchConfig {
                 batch: 500,
@@ -575,7 +574,7 @@ impl From<OrderedConfig> for Config {
             description: config.description,
             deliver_policy: config.deliver_policy,
             ack_policy: AckPolicy::None,
-            ack_wait: Duration::from_secs(60 * 60 * 22),
+            ack_wait: Duration::default(),
             max_deliver: 1,
             filter_subject: config.filter_subject,
             #[cfg(feature = "server_2_10")]
@@ -633,7 +632,7 @@ impl IntoConsumerConfig for OrderedConfig {
             deliver_group: None,
             deliver_policy: self.deliver_policy,
             ack_policy: AckPolicy::None,
-            ack_wait: Duration::from_secs(60 * 60 * 22),
+            ack_wait: Duration::default(),
             max_deliver: 1,
             filter_subject: self.filter_subject,
             #[cfg(feature = "server_2_10")]
