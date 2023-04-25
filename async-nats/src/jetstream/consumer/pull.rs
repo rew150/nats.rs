@@ -451,8 +451,8 @@ impl<'a> futures::Stream for Sequence<'a> {
 impl<'a> Consumer<OrderedConfig> {
     /// Returns a stream of messages for Ordered Pull Consumer.
     ///
-    /// Ordered consumers uses R1 ephemeral consumer, no matter the replicaiton factor of the
-    /// Stream. It does not use acks, isntead it tracks sequences and recreate itself whenever it
+    /// Ordered consumers uses single replica ephemeral consumer, no matter the replication factor of the
+    /// Stream. It does not use acks, instead it tracks sequences and recreate itself whenever it
     /// sees mismatch.
     ///
     /// # Example
