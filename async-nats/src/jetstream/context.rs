@@ -245,30 +245,27 @@ impl Context {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn create_stream<S>(&self, stream_config: S) -> Result<Stream, Error>
+    pub async fn create_stream<S>(&self, stream_config: S) -> Result<Stream, CreateStreamError>
     where
         Config: From<S>,
     {
         let mut config: Config = stream_config.into();
         if config.name.is_empty() {
-            return Err(Box::new(io::Error::new(
-                ErrorKind::InvalidInput,
-                "the stream name must not be empty",
-            )));
+            return Err(CreateStreamError::new(
+                CreateStreamErrorKind::EmptyStreamName,
+            ));
         }
         if config.name.contains([' ', '.']) {
-            return Err(Box::new(io::Error::new(
-                ErrorKind::InvalidInput,
-                "stream name cannot contain `.`, `_`",
-            )));
+            return Err(CreateStreamError::new(
+                CreateStreamErrorKind::InvalidStreamName,
+            ));
         }
         if let Some(ref mut mirror) = config.mirror {
             if let Some(ref mut domain) = mirror.domain {
                 if mirror.external.is_some() {
-                    return Err(Box::new(io::Error::new(
-                        ErrorKind::Other,
-                        "domain and external are both set",
-                    )));
+                    return Err(CreateStreamError::new(
+                        CreateStreamErrorKind::DomainAndExternalSet,
+                    ));
                 }
                 mirror.external = Some(External {
                     api_prefix: format!("$JS.{domain}.API"),
@@ -281,10 +278,9 @@ impl Context {
             for source in sources {
                 if let Some(ref mut domain) = source.domain {
                     if source.external.is_some() {
-                        return Err(Box::new(io::Error::new(
-                            ErrorKind::Other,
-                            "domain and external are both set",
-                        )));
+                        return Err(CreateStreamError::new(
+                            CreateStreamErrorKind::DomainAndExternalSet,
+                        ));
                     }
                     source.external = Some(External {
                         api_prefix: format!("$JS.{domain}.API"),
@@ -294,7 +290,23 @@ impl Context {
             }
         }
         let subject = format!("STREAM.CREATE.{}", config.name);
-        let response: Response<Info> = self.request(subject, &config).await?;
+        let response: Response<Info> =
+            self.request(subject, &config)
+                .await
+                .map_err(|err| match err.kind() {
+                    RequestErrorKind::NoResponders => {
+                        CreateStreamError::new(CreateStreamErrorKind::JetStreamUnavailable)
+                    }
+                    RequestErrorKind::TimedOut => {
+                        CreateStreamError::new(CreateStreamErrorKind::TimedOut)
+                    }
+                    RequestErrorKind::ResponseParse => {
+                        CreateStreamError::new(CreateStreamErrorKind::ResponseParse)
+                    }
+                    RequestErrorKind::Other => {
+                        CreateStreamError::with_source(CreateStreamErrorKind::ResponseError, err)
+                    }
+                })?;
 
         match response {
             Response::Err { error } => Err(Box::new(std::io::Error::new(
@@ -1282,6 +1294,12 @@ impl Display for CreateStreamError {
             CreateStreamErrorKind::JetStreamError => {
                 write!(f, "jetstream error: {}", self.format_source())
             }
+            CreateStreamErrorKind::TimedOut => write!(f, "jetstream request timed out"),
+            CreateStreamErrorKind::JetStreamUnavailable => write!(f, "jetstream unavailable"),
+            CreateStreamErrorKind::ResponseParse => write!(f, "failed to parse server response"),
+            CreateStreamErrorKind::ResponseError => {
+                write!(f, "response error: {}", self.format_source())
+            }
         }
     }
 }
@@ -1297,5 +1315,9 @@ pub enum CreateStreamErrorKind {
     EmptyStreamName,
     InvalidStreamName,
     DomainAndExternalSet,
+    JetStreamUnavailable,
     JetStreamError,
+    TimedOut,
+    ResponseError,
+    ResponseParse,
 }
