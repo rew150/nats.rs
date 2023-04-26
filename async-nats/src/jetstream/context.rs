@@ -290,29 +290,13 @@ impl Context {
             }
         }
         let subject = format!("STREAM.CREATE.{}", config.name);
-        let response: Response<Info> =
-            self.request(subject, &config)
-                .await
-                .map_err(|err| match err.kind() {
-                    RequestErrorKind::NoResponders => {
-                        CreateStreamError::new(CreateStreamErrorKind::JetStreamUnavailable)
-                    }
-                    RequestErrorKind::TimedOut => {
-                        CreateStreamError::new(CreateStreamErrorKind::TimedOut)
-                    }
-                    RequestErrorKind::ResponseParse => {
-                        CreateStreamError::new(CreateStreamErrorKind::ResponseParse)
-                    }
-                    RequestErrorKind::Other => {
-                        CreateStreamError::with_source(CreateStreamErrorKind::ResponseError, err)
-                    }
-                })?;
+        let response: Response<Info> = self.request(subject, &config).await?;
 
         match response {
-            Response::Err { error } => Err(Box::new(std::io::Error::new(
-                ErrorKind::Other,
-                format!("nats: error while creating stream: {}", error),
-            ))),
+            Response::Err { error } => Err(CreateStreamError::with_source(
+                CreateStreamErrorKind::JetStreamError,
+                error,
+            )),
             Response::Ok(info) => Ok(Stream {
                 context: self.clone(),
                 info,
@@ -379,7 +363,10 @@ impl Context {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get_or_create_stream<S>(&self, stream_config: S) -> Result<Stream, Error>
+    pub async fn get_or_create_stream<S>(
+        &self,
+        stream_config: S,
+    ) -> Result<Stream, CreateStreamError>
     where
         S: Into<Config>,
     {
@@ -1320,4 +1307,21 @@ pub enum CreateStreamErrorKind {
     TimedOut,
     ResponseError,
     ResponseParse,
+}
+
+impl From<RequestError> for CreateStreamError {
+    fn from(error: RequestError) -> Self {
+        match error.kind() {
+            RequestErrorKind::NoResponders => {
+                CreateStreamError::new(CreateStreamErrorKind::JetStreamUnavailable)
+            }
+            RequestErrorKind::TimedOut => CreateStreamError::new(CreateStreamErrorKind::TimedOut),
+            RequestErrorKind::ResponseParse => {
+                CreateStreamError::new(CreateStreamErrorKind::ResponseParse)
+            }
+            RequestErrorKind::Other => {
+                CreateStreamError::with_source(CreateStreamErrorKind::ResponseError, error)
+            }
+        }
+    }
 }
