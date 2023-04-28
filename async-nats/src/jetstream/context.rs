@@ -947,7 +947,7 @@ struct StreamInfoPage {
     streams: Option<Vec<super::stream::Info>>,
 }
 
-type PageRequest = Pin<Box<dyn Future<Output = Result<StreamPage, Error>>>>;
+type PageRequest = Pin<Box<dyn Future<Output = Result<StreamPage, Error>> + Send>>;
 
 pub struct StreamNames {
     context: Context,
